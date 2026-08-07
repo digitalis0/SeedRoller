@@ -1,0 +1,9 @@
+# Ignore everything
+*
+
+# Except these files
+!README.md
+!SeedRoller.html
+!.gitignore
+!screenshot-rolling.jpg
+!screenshot-result.jpg

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SeedRoller — BIP-39 Seed Phrase Generator</title>
+<style>
+    :root {
+        --bg: #f5f2eb;
+        --surface: #ffffff;
+        --text: #2d2418;
+        --text-secondary: #6b5e4a;
+        --border: #d9ceb8;
+        --accent: #b8860b;
+        --accent-hover: #9a7009;
+        --danger: #c0392b;
+        --danger-hover: #a33024;
+        --progress-bg: #e0d5c1;
+        --dice-bg: #faf7f0;
+        --dice-border: #c4b594;
+        --dice-text: #4a3724;
+        --shadow: 0 2px 8px rgba(0,0,0,0.08);
+        --radius: 12px;
+        --font: system-ui, -apple-system, sans-serif;
+        --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg: #1a1612;
+            --surface: #252018;
+            --text: #e8dcc8;
+            --text-secondary: #9e8d72;
+            --border: #3d3424;
+            --accent: #d4a017;
+            --accent-hover: #e8b828;
+            --danger: #e74c3c;
+            --danger-hover: #c0392b;
+            --progress-bg: #2d2418;
+            --dice-bg: #2a2216;
+            --dice-border: #4a3d28;
+            --dice-text: #d4c4a8;
+            --shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        padding: 16px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+    }
+
+    .container {
+        width: 100%;
+        max-width: 440px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding-bottom: 16px;
+    }
+
+    /* Header */
+    header {
+        text-align: center;
+        padding-top: 8px;
+    }
+    header h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: -0.02em;
+    }
+    header .subtitle {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+
+    /* Instructions */
+    .instructions {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        font-size: 0.82rem;
+        line-height: 1.4;
+        color: var(--text-secondary);
+        box-shadow: var(--shadow);
+    }
+    .instructions p + p { margin-top: 6px; }
+    .instructions strong { color: var(--text); }
+
+    /* Dice section */
+    .dice-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .dice-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+
+    .dice-btn {
+        aspect-ratio: 1;
+        min-height: 64px;
+        font-size: 1.6rem;
+        font-weight: 700;
+        font-family: var(--font);
+        background: var(--dice-bg);
+        border: 2px solid var(--dice-border);
+        border-radius: var(--radius);
+        color: var(--dice-text);
+        cursor: pointer;
+        transition: transform 0.1s, box-shadow 0.1s, border-color 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .dice-btn:hover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(184,134,11,0.15); }
+    .dice-btn:active { transform: scale(0.93); box-shadow: none; }
+    .dice-btn.dot {
+        display: grid;
+        grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+        padding: 8px;
+    }
+    .dice-btn .pip {
+        width: 12px; height: 12px;
+        background: var(--dice-text);
+        border-radius: 50%;
+        place-self: center;
+        opacity: 0;
+    }
+    .dice-btn .pip.on { opacity: 1; }
+
+    .dice-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .btn {
+        flex: 1;
+        padding: 12px 16px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        font-family: var(--font);
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    .btn-undo {
+        background: var(--surface);
+        color: var(--text);
+    }
+    .btn-undo:hover { border-color: var(--accent); }
+    .btn-reset {
+        background: var(--surface);
+        color: var(--danger);
+        border-color: var(--danger);
+    }
+    .btn-reset:hover { background: var(--danger); color: #fff; }
+
+    /* Progress */
+    .progress-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 14px;
+        box-shadow: var(--shadow);
+    }
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 6px;
+    }
+    .progress-count {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--text);
+    }
+    .progress-count-unit {
+        font-size: 0.85rem;
+        font-weight: 400;
+    }
+    .progress-label {
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+    }
+    .progress-bar-outer {
+        height: 10px;
+        background: var(--progress-bg);
+        border-radius: 5px;
+        overflow: hidden;
+        margin-bottom: 6px;
+    }
+    .progress-bar-inner {
+        height: 100%;
+        width: 0%;
+        background: #b8860b;
+        border-radius: 5px;
+        transition: width 0.2s, background 0.3s;
+    }
+    .progress-note {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        text-align: center;
+    }
+
+    .last-rolls {
+        display: flex;
+        gap: 6px;
+        margin-top: 4px;
+        justify-content: center;
+        min-height: 24px;
+    }
+    .last-rolls .dot {
+        width: 22px; height: 22px;
+        border-radius: 50%;
+        background: var(--border);
+        color: var(--text);
+        font-size: 0.7rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .last-rolls .dot.active {
+        background: var(--accent);
+        color: #fff;
+    }
+
+    /* Entropy visualization — compact */
+    .entropy-panel {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    .entropy-hash {
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--accent);
+        word-break: break-all;
+        line-height: 1.3;
+        background: var(--dice-bg);
+        border-radius: 6px;
+        padding: 6px 10px;
+        transition: background 0.15s;
+    }
+    .entropy-hash.flash {
+        background: var(--accent);
+        color: #fff;
+    }
+    .entropy-info {
+        font-size: 0.68rem;
+        color: var(--text-secondary);
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+        padding: 0 2px;
+    }
+
+    /* Generate button */
+    .btn-generate {
+        width: 100%;
+        padding: 16px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        font-family: var(--font);
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: background 0.15s, transform 0.1s;
+        -webkit-tap-highlight-color: transparent;
+        box-shadow: var(--shadow);
+    }
+    .btn-generate:hover { background: var(--accent-hover); }
+    .btn-generate:active { transform: scale(0.97); }
+    .btn-generate:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+    .btn-generate:disabled:hover { background: var(--accent); }
+    .btn-generate:disabled:active { transform: none; }
+
+    /* Results */
+    .result-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: var(--shadow);
+        display: none;
+    }
+    .result-section.visible { display: block; }
+    .result-section h2 {
+        font-size: 1.2rem;
+        margin-bottom: 4px;
+        color: var(--accent);
+    }
+    .result-section .result-subtitle {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+    }
+
+    .word-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    .word-table th {
+        text-align: left;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border);
+    }
+    .word-table td {
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+    }
+    .word-table tr:last-child td { border-bottom: none; }
+    .word-table .col-num { color: var(--text-secondary); width: 30px; text-align: right; }
+    .word-table .col-idx { font-family: var(--mono); font-size: 0.78rem; width: 50px; }
+    .word-table .col-bin { font-family: var(--mono); font-size: 0.72rem; color: var(--text-secondary); word-break: keep-all; }
+    .word-table .col-word { font-weight: 600; }
+
+    .result-actions {
+        display: flex; gap: 10px; margin-top: 16px;
+    }
+    .paper-note {
+        font-size: 0.88rem;
+        color: var(--text);
+        text-align: center;
+        width: 100%;
+        line-height: 1.5;
+    }
+    .paper-note strong {
+        color: var(--accent);
+    }
+
+    /* Keyboard hint */
+    .kbd-hint {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        text-align: center;
+        margin-top: -8px;
+    }
+    .kbd-hint kbd {
+        display: inline-block;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🎲 SeedRoller</h1>
+        <div class="subtitle">BIP-39 Seed Phrase Generator</div>
+    </header>
+
+    <div class="instructions">
+        <p><strong>Roll a physical die</strong> and tap the result below. Repeat at least <strong>100 times</strong>.</p>
+        <p>Rolling more than 100 times compensates for an imperfectly balanced die. Entropy is capped at 256 bits (SHA-256). Everything is generated locally — no data leaves your device. Works fully offline.</p>
+    </div>
+
+    <div class="dice-section">
+        <div class="dice-grid" id="diceGrid">
+            <button class="dice-btn" data-value="1" aria-label="Roll 1">1</button>
+            <button class="dice-btn" data-value="2" aria-label="Roll 2">2</button>
+            <button class="dice-btn" data-value="3" aria-label="Roll 3">3</button>
+            <button class="dice-btn" data-value="4" aria-label="Roll 4">4</button>
+            <button class="dice-btn" data-value="5" aria-label="Roll 5">5</button>
+            <button class="dice-btn" data-value="6" aria-label="Roll 6">6</button>
+        </div>
+        <div class="dice-actions">
+            <button class="btn btn-undo" id="btnUndo" title="Undo (Ctrl+Z)">↩ Undo</button>
+            <button class="btn btn-reset" id="btnReset" title="Start over">↺ Reset</button>
+        </div>
+    </div>
+
+    <div class="kbd-hint">Or use keyboard: <kbd>1</kbd>–<kbd>6</kbd> / <kbd>Ctrl+Z</kbd> for undo</div>
+
+    <div class="progress-section">
+        <div class="progress-header">
+            <span class="progress-count"><span id="rollCount">0</span> <span class="progress-count-unit">rolls</span></span>
+            <span class="progress-label" id="progressLabel">min. 100 needed</span>
+        </div>
+        <div class="progress-bar-outer">
+            <div class="progress-bar-inner" id="progressBar"></div>
+        </div>
+        <div class="last-rolls" id="lastRolls"></div>
+        <div class="entropy-panel" id="entropyPanel" style="display:none">
+            <span class="entropy-hash" id="entropyHash"></span>
+            <div class="entropy-info">
+                <span id="entropyBits"></span>
+                <span id="entropyRaw"></span>
+            </div>
+        </div>
+        <div class="progress-note" id="progressNote">Start rolling to generate your seed phrase</div>
+    </div>
+
+    <button class="btn-generate" id="btnGenerate" disabled>🎲 Generate Seed Phrase</button>
+
+    <div class="result-section" id="resultSection">
+        <h2>Your 24-word Seed Phrase</h2>
+        <div class="result-subtitle" id="resultMeta"></div>
+        <table class="word-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Index</th>
+                    <th>11-bit</th>
+                    <th>Word</th>
+                </tr>
+            </thead>
+            <tbody id="wordTableBody"></tbody>
+        </table>
+        <div class="result-actions">
+            <p class="paper-note">✍️ <strong>Write these 24 words down on paper.</strong> Store it safely and offline. Share it with no one.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== BIP-39 WORDLIST ====================
+const WORDLIST = [
+"abandon","ability","able","about","above","absent","absorb","abstract","absurd","abuse","access","accident","account","accuse","achieve","acid","acoustic","acquire","across","act","action","actor","actress","actual","adapt","add","addict","address","adjust","admit","adult","advance","advice","aerobic","affair","afford","afraid","again","age","agent","agree","ahead","aim","air","airport","aisle","alarm","album","alcohol","alert","alien","all","alley","allow","almost","alone","alpha","already","also","alter","always","amateur","amazing","among","amount","amused","analyst","anchor","ancient","anger","angle","angry","animal","ankle","announce","annual","another","answer","antenna","antique","anxiety","any","apart","apology","appear","apple","approve","april","arch","arctic","area","arena","argue","arm","armed","armor","army","around","arrange","arrest","arrive","arrow","art","artefact","artist","artwork","ask","aspect","assault","asset","assist","assume","asthma","athlete","atom","attack","attend","attitude","attract","auction","audit","august","aunt","author","auto","autumn","average","avocado","avoid","awake","aware","away","awesome","awful","awkward","axis","baby","bachelor","bacon","badge","bag","balance","balcony","ball","bamboo","banana","banner","bar","barely","bargain","barrel","base","basic","basket","battle","beach","bean","beauty","because","become","beef","before","begin","behave","behind","believe","below","belt","bench","benefit","best","betray","better","between","beyond","bicycle","bid","bike","bind","biology","bird","birth","bitter","black","blade","blame","blanket","blast","bleak","bless","blind","blood","blossom","blouse","blue","blur","blush","board","boat","body","boil","bomb","bone","bonus","book","boost","border","boring","borrow","boss","bottom","bounce","box","boy","bracket","brain","brand","brass","brave","bread","breeze","brick","bridge","brief","bright","bring","brisk","broccoli","broken","bronze","broom","brother","brown","brush","bubble","buddy","budget","buffalo","build","bulb","bulk","bullet","bundle","bunker","burden","burger","burst","bus","business","busy","butter","buyer","buzz","cabbage","cabin","cable","cactus","cage","cake","call","calm","camera","camp","can","canal","cancel","candy","cannon","canoe","canvas","canyon","capable","capital","captain","car","carbon","card","cargo","carpet","carry","cart","case","cash","casino","castle","casual","cat","catalog","catch","category","cattle","caught","cause","caution","cave","ceiling","celery","cement","census","century","cereal","certain","chair","chalk","champion","change","chaos","chapter","charge","chase","chat","cheap","check","cheese","chef","cherry","chest","chicken","chief","child","chimney","choice","choose","chronic","chuckle","chunk","churn","cigar","cinnamon","circle","citizen","city","civil","claim","clap","clarify","claw","clay","clean","clerk","clever","click","client","cliff","climb","clinic","clip","clock","clog","close","cloth","cloud","clown","club","clump","cluster","clutch","coach","coast","coconut","code","coffee","coil","coin","collect","color","column","combine","come","comfort","comic","common","company","concert","conduct","confirm","congress","connect","consider","control","convince","cook","cool","copper","copy","coral","core","corn","correct","cost","cotton","couch","country","couple","course","cousin","cover","coyote","crack","cradle","craft","cram","crane","crash","crater","crawl","crazy","cream","credit","creek","crew","cricket","crime","crisp","critic","crop","cross","crouch","crowd","crucial","cruel","cruise","crumble","crunch","crush","cry","crystal","cube","culture","cup","cupboard","curious","current","curtain","curve","cushion","custom","cute","cycle","dad","damage","damp","dance","danger","daring","dash","daughter","dawn","day","deal","debate","debris","decade","december","decide","decline","decorate","decrease","deer","defense","define","defy","degree","delay","deliver","demand","demise","denial","dentist","deny","depart","depend","deposit","depth","deputy","derive","describe","desert","design","desk","despair","destroy","detail","detect","develop","device","devote","diagram","dial","diamond","diary","dice","diesel","diet","differ","digital","dignity","dilemma","dinner","dinosaur","direct","dirt","disagree","discover","disease","dish","dismiss","disorder","display","distance","divert","divide","divorce","dizzy","doctor","document","dog","doll","dolphin","domain","donate","donkey","donor","door","dose","double","dove","draft","dragon","drama","drastic","draw","dream","dress","drift","drill","drink","drip","drive","drop","drum","dry","duck","dumb","dune","during","dust","dutch","duty","dwarf","dynamic","eager","eagle","early","earn","earth","easily","east","easy","echo","ecology","economy","edge","edit","educate","effort","egg","eight","either","elbow","elder","electric","elegant","element","elephant","elevator","elite","else","embark","embody","embrace","emerge","emotion","employ","empower","empty","enable","enact","end","endless","endorse","enemy","energy","enforce","engage","engine","enhance","enjoy","enlist","enough","enrich","enroll","ensure","enter","entire","entry","envelope","episode","equal","equip","era","erase","erode","erosion","error","erupt","escape","essay","essence","estate","eternal","ethics","evidence","evil","evoke","evolve","exact","example","excess","exchange","excite","exclude","excuse","execute","exercise","exhaust","exhibit","exile","exist","exit","exotic","expand","expect","expire","explain","expose","express","extend","extra","eye","eyebrow","fabric","face","faculty","fade","faint","faith","fall","false","fame","family","famous","fan","fancy","fantasy","farm","fashion","fat","fatal","father","fatigue","fault","favorite","feature","february","federal","fee","feed","feel","female","fence","festival","fetch","fever","few","fiber","fiction","field","figure","file","film","filter","final","find","fine","finger","finish","fire","firm","first","fiscal","fish","fit","fitness","fix","flag","flame","flash","flat","flavor","flee","flight","flip","float","flock","floor","flower","fluid","flush","fly","foam","focus","fog","foil","fold","follow","food","foot","force","forest","forget","fork","fortune","forum","forward","fossil","foster","found","fox","fragile","frame","frequent","fresh","friend","fringe","frog","front","frost","frown","frozen","fruit","fuel","fun","funny","furnace","fury","future","gadget","gain","galaxy","gallery","game","gap","garage","garbage","garden","garlic","garment","gas","gasp","gate","gather","gauge","gaze","general","genius","genre","gentle","genuine","gesture","ghost","giant","gift","giggle","ginger","giraffe","girl","give","glad","glance","glare","glass","glide","glimpse","globe","gloom","glory","glove","glow","glue","goat","goddess","gold","good","goose","gorilla","gospel","gossip","govern","gown","grab","grace","grain","grant","grape","grass","gravity","great","green","grid","grief","grit","grocery","group","grow","grunt","guard","guess","guide","guilt","guitar","gun","gym","habit","hair","half","hammer","hamster","hand","happy","harbor","hard","harsh","harvest","hat","have","hawk","hazard","head","health","heart","heavy","hedgehog","height","hello","helmet","help","hen","hero","hidden","high","hill","hint","hip","hire","history","hobby","hockey","hold","hole","holiday","hollow","home","honey","hood","hope","horn","horror","horse","hospital","host","hotel","hour","hover","hub","huge","human","humble","humor","hundred","hungry","hunt","hurdle","hurry","hurt","husband","hybrid","ice","icon","idea","identify","idle","ignore","ill","illegal","illness","image","imitate","immense","immune","impact","impose","improve","impulse","inch","include","income","increase","index","indicate","indoor","industry","infant","inflict","inform","inhale","inherit","initial","inject","injury","inmate","inner","innocent","input","inquiry","insane","insect","inside","inspire","install","intact","interest","into","invest","invite","involve","iron","island","isolate","issue","item","ivory","jacket","jaguar","jar","jazz","jealous","jeans","jelly","jewel","job","join","joke","journey","joy","judge","juice","jump","jungle","junior","junk","just","kangaroo","keen","keep","ketchup","key","kick","kid","kidney","kind","kingdom","kiss","kit","kitchen","kite","kitten","kiwi","knee","knife","knock","know","lab","label","labor","ladder","lady","lake","lamp","language","laptop","large","later","latin","laugh","laundry","lava","law","lawn","lawsuit","layer","lazy","leader","leaf","learn","leave","lecture","left","leg","legal","legend","leisure","lemon","lend","length","lens","leopard","lesson","letter","level","liar","liberty","library","license","life","lift","light","like","limb","limit","link","lion","liquid","list","little","live","lizard","load","loan","lobster","local","lock","logic","lonely","long","loop","lottery","loud","lounge","love","loyal","lucky","luggage","lumber","lunar","lunch","luxury","lyrics","machine","mad","magic","magnet","maid","mail","main","major","make","mammal","man","manage","mandate","mango","mansion","manual","maple","marble","march","margin","marine","market","marriage","mask","mass","master","match","material","math","matrix","matter","maximum","maze","meadow","mean","measure","meat","mechanic","medal","media","melody","melt","member","memory","mention","menu","mercy","merge","merit","merry","mesh","message","metal","method","middle","midnight","milk","million","mimic","mind","minimum","minor","minute","miracle","mirror","misery","miss","mistake","mix","mixed","mixture","mobile","model","modify","mom","moment","monitor","monkey","monster","month","moon","moral","more","morning","mosquito","mother","motion","motor","mountain","mouse","move","movie","much","muffin","mule","multiply","muscle","museum","mushroom","music","must","mutual","myself","mystery","myth","naive","name","napkin","narrow","nasty","nation","nature","near","neck","need","negative","neglect","neither","nephew","nerve","nest","net","network","neutral","never","news","next","nice","night","noble","noise","nominee","noodle","normal","north","nose","notable","note","nothing","notice","novel","now","nuclear","number","nurse","nut","oak","obey","object","oblige","obscure","observe","obtain","obvious","occur","ocean","october","odor","off","offer","office","often","oil","okay","old","olive","olympic","omit","once","one","onion","online","only","open","opera","opinion","oppose","option","orange","orbit","orchard","order","ordinary","organ","orient","original","orphan","ostrich","other","outdoor","outer","output","outside","oval","oven","over","own","owner","oxygen","oyster","ozone","pact","paddle","page","pair","palace","palm","panda","panel","panic","panther","paper","parade","parent","park","parrot","party","pass","patch","path","patient","patrol","pattern","pause","pave","payment","peace","peanut","pear","peasant","pelican","pen","penalty","pencil","people","pepper","perfect","permit","person","pet","phone","photo","phrase","physical","piano","picnic","picture","piece","pig","pigeon","pill","pilot","pink","pioneer","pipe","pistol","pitch","pizza","place","planet","plastic","plate","play","please","pledge","pluck","plug","plunge","poem","poet","point","polar","pole","police","pond","pony","pool","popular","portion","position","possible","post","potato","pottery","poverty","powder","power","practice","praise","predict","prefer","prepare","present","pretty","prevent","price","pride","primary","print","priority","prison","private","prize","problem","process","produce","profit","program","project","promote","proof","property","prosper","protect","proud","provide","public","pudding","pull","pulp","pulse","pumpkin","punch","pupil","puppy","purchase","purity","purpose","purse","push","put","puzzle","pyramid","quality","quantum","quarter","question","quick","quit","quiz","quote","rabbit","raccoon","race","rack","radar","radio","rail","rain","raise","rally","ramp","ranch","random","range","rapid","rare","rate","rather","raven","raw","razor","ready","real","reason","rebel","rebuild","recall","receive","recipe","record","recycle","reduce","reflect","reform","refuse","region","regret","regular","reject","relax","release","relief","rely","remain","remember","remind","remove","render","renew","rent","reopen","repair","repeat","replace","report","require","rescue","resemble","resist","resource","response","result","retire","retreat","return","reunion","reveal","review","reward","rhythm","rib","ribbon","rice","rich","ride","ridge","rifle","right","rigid","ring","riot","ripple","risk","ritual","rival","river","road","roast","robot","robust","rocket","romance","roof","rookie","room","rose","rotate","rough","round","route","royal","rubber","rude","rug","rule","run","runway","rural","sad","saddle","sadness","safe","sail","salad","salmon","salon","salt","salute","same","sample","sand","satisfy","satoshi","sauce","sausage","save","say","scale","scan","scare","scatter","scene","scheme","school","science","scissors","scorpion","scout","scrap","screen","script","scrub","sea","search","season","seat","second","secret","section","security","seed","seek","segment","select","sell","seminar","senior","sense","sentence","series","service","session","settle","setup","seven","shadow","shaft","shallow","share","shed","shell","sheriff","shield","shift","shine","ship","shiver","shock","shoe","shoot","shop","short","shoulder","shove","shrimp","shrug","shuffle","shy","sibling","sick","side","siege","sight","sign","silent","silk","silly","silver","similar","simple","since","sing","siren","sister","situate","six","size","skate","sketch","ski","skill","skin","skirt","skull","slab","slam","sleep","slender","slice","slide","slight","slim","slogan","slot","slow","slush","small","smart","smile","smoke","smooth","snack","snake","snap","sniff","snow","soap","soccer","social","sock","soda","soft","solar","soldier","solid","solution","solve","someone","song","soon","sorry","sort","soul","sound","soup","source","south","space","spare","spatial","spawn","speak","special","speed","spell","spend","sphere","spice","spider","spike","spin","spirit","split","spoil","sponsor","spoon","sport","spot","spray","spread","spring","spy","square","squeeze","squirrel","stable","stadium","staff","stage","stairs","stamp","stand","start","state","stay","steak","steel","stem","step","stereo","stick","still","sting","stock","stomach","stone","stool","story","stove","strategy","street","strike","strong","struggle","student","stuff","stumble","style","subject","submit","subway","success","such","sudden","suffer","sugar","suggest","suit","summer","sun","sunny","sunset","super","supply","supreme","sure","surface","surge","surprise","surround","survey","suspect","sustain","swallow","swamp","swap","swarm","swear","sweet","swift","swim","swing","switch","sword","symbol","symptom","syrup","system","table","tackle","tag","tail","talent","talk","tank","tape","target","task","taste","tattoo","taxi","teach","team","tell","ten","tenant","tennis","tent","term","test","text","thank","that","theme","then","theory","there","they","thing","this","thought","three","thrive","throw","thumb","thunder","ticket","tide","tiger","tilt","timber","time","tiny","tip","tired","tissue","title","toast","tobacco","today","toddler","toe","together","toilet","token","tomato","tomorrow","tone","tongue","tonight","tool","tooth","top","topic","topple","torch","tornado","tortoise","toss","total","tourist","toward","tower","town","toy","track","trade","traffic","tragic","train","transfer","trap","trash","travel","tray","treat","tree","trend","trial","tribe","trick","trigger","trim","trip","trophy","trouble","truck","true","truly","trumpet","trust","truth","try","tube","tuition","tumble","tuna","tunnel","turkey","turn","turtle","twelve","twenty","twice","twin","twist","two","type","typical","ugly","umbrella","unable","unaware","uncle","uncover","under","undo","unfair","unfold","unhappy","uniform","unique","unit","universe","unknown","unlock","until","unusual","unveil","update","upgrade","uphold","upon","upper","upset","urban","urge","usage","use","used","useful","useless","usual","utility","vacant","vacuum","vague","valid","valley","valve","van","vanish","vapor","various","vast","vault","vehicle","velvet","vendor","venture","venue","verb","verify","version","very","vessel","veteran","viable","vibrant","vicious","victory","video","view","village","vintage","violin","virtual","virus","visa","visit","visual","vital","vivid","vocal","voice","void","volcano","volume","vote","voyage","wage","wagon","wait","walk","wall","walnut","want","warfare","warm","warrior","wash","wasp","waste","water","wave","way","wealth","weapon","wear","weasel","weather","web","wedding","weekend","weird","welcome","west","wet","whale","what","wheat","wheel","when","where","whip","whisper","wide","width","wife","wild","will","win","window","wine","wing","wink","winner","winter","wire","wisdom","wise","wish","witness","wolf","woman","wonder","wood","wool","word","work","world","worry","worth","wrap","wreck","wrestle","wrist","write","wrong","yard","year","yellow","you","young","youth","zebra","zero","zone","zoo"
+];
+
+// ==================== STATE ====================
+const MIN_ROLLS = 100;
+let rolls = [];
+
+// ==================== DOM REFS ====================
+const $ = (id) => document.getElementById(id);
+const rollCountEl = $('rollCount');
+const progressBar = $('progressBar');
+const progressLabel = $('progressLabel');
+const progressNote = $('progressNote');
+const lastRollsEl = $('lastRolls');
+const entropyPanel = $('entropyPanel');
+const entropyRaw = $('entropyRaw');
+const entropyHash = $('entropyHash');
+const entropyBits = $('entropyBits');
+const btnGenerate = $('btnGenerate');
+const resultSection = $('resultSection');
+const wordTableBody = $('wordTableBody');
+const resultMeta = $('resultMeta');
+
+// ==================== HELPERS ====================
+function to11BitBinary(n) {
+    return n.toString(2).padStart(11, '0');
+}
+
+function getProgressColor(ratio) {
+    if (ratio < 0.5) return '#c0392b';
+    if (ratio < 0.8) return '#d4a017';
+    if (ratio < 1) return '#27ae60';
+    return '#1e8449';
+}
+
+function bytesToHex(bytes) {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ==================== LIVE ENTROPY ====================
+async function computeLiveEntropy() {
+    if (rolls.length === 0) {
+        entropyPanel.style.display = 'none';
+        return;
+    }
+
+    entropyPanel.style.display = 'flex';
+
+    // Compute SHA-256 of roll data
+    const rollString = rolls.join('');
+    const encoder = new TextEncoder();
+    const rollBytes = encoder.encode(rollString);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', rollBytes);
+    const hashHex = bytesToHex(new Uint8Array(hashBuffer));
+
+    // Truncated hash: first 16 + last 16 chars (fits ~1 line on mobile)
+    const shortHash = hashHex.length > 40
+        ? hashHex.slice(0, 16) + '…' + hashHex.slice(-16)
+        : hashHex;
+
+    // Flash animation if hash changed
+    const oldHash = entropyHash.textContent;
+    if (oldHash && oldHash !== shortHash) {
+        entropyHash.classList.add('flash');
+        setTimeout(() => entropyHash.classList.remove('flash'), 250);
+    }
+    entropyHash.textContent = 'SHA-256: ' + shortHash;
+
+    // Compact raw data (first 30 chars)
+    const rawDisplay = rollString.length > 30
+        ? rollString.slice(0, 30) + '…'
+        : rollString;
+    entropyRaw.textContent = 'data: ' + rawDisplay;
+
+    // Entropy bits
+    const rawBits = Math.min(rollString.length * Math.log2(6), 256);
+    entropyBits.textContent = '🔐 ~' + rawBits.toFixed(0) + ' bits entropy';
+}
+
+// ==================== UI UPDATE ====================
+function updateUI() {
+    const count = rolls.length;
+    const ratio = Math.min(count / MIN_ROLLS, 1);
+
+    // Counter
+    rollCountEl.textContent = count;
+
+    // Progress bar
+    progressBar.style.width = (ratio * 100) + '%';
+    progressBar.style.background = getProgressColor(ratio);
+
+    // Label
+    if (count < MIN_ROLLS) {
+        progressLabel.textContent = 'min. ' + MIN_ROLLS + ' needed';
+    } else {
+        progressLabel.textContent = '✓ Ready! You can keep rolling';
+    }
+
+    // Note
+    if (count === 0) {
+        progressNote.textContent = 'Start rolling to generate your seed phrase';
+    } else if (count < MIN_ROLLS) {
+        progressNote.textContent = (MIN_ROLLS - count) + ' rolls remaining';
+    } else {
+        const extra = count - MIN_ROLLS;
+        progressNote.textContent = 'Minimum reached' + (extra > 0 ? ' (+' + extra + ' extra rolls to compensate for die bias)' : '');
+    }
+
+    // Generate button
+    btnGenerate.disabled = count < MIN_ROLLS;
+    if (count >= MIN_ROLLS) {
+        btnGenerate.textContent = '🎲 Generate Seed Phrase (' + count + ' rolls)';
+    } else {
+        btnGenerate.textContent = '🎲 Generate Seed Phrase';
+    }
+
+    // Last 5 rolls
+    const recent = rolls.slice(-5);
+    lastRollsEl.innerHTML = '';
+    for (let i = 0; i < 5; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        if (i < recent.length) {
+            dot.textContent = recent[i];
+            dot.classList.add('active');
+        }
+        lastRollsEl.appendChild(dot);
+    }
+
+    // Live entropy visualization
+    computeLiveEntropy();
+}
+
+// ==================== BIP-39 GENERATION ====================
+async function generateSeedPhrase() {
+    if (rolls.length < MIN_ROLLS) return null;
+
+    // 1. Concatenate all rolls as a string
+    const rollString = rolls.join('');
+
+    // 2. SHA-256 hash the roll string → 256 bits of entropy
+    const encoder = new TextEncoder();
+    const rollBytes = encoder.encode(rollString);
+    const entropyHash = await crypto.subtle.digest('SHA-256', rollBytes);
+    const entropy = new Uint8Array(entropyHash); // 32 bytes
+
+    // 3. Compute checksum: SHA-256(entropy), take first byte (8 bits for 256-bit entropy)
+    const checksumHash = await crypto.subtle.digest('SHA-256', entropy);
+    const checksumByte = new Uint8Array(checksumHash)[0];
+
+    // 4. Combine: 32 bytes entropy + 1 byte checksum = 33 bytes = 264 bits
+    const combined = new Uint8Array(33);
+    combined.set(entropy);
+    combined[32] = checksumByte;
+
+    // 5. Convert to BigInt for bit manipulation
+    let bigInt = 0n;
+    for (let i = 0; i < 33; i++) {
+        bigInt = (bigInt << 8n) | BigInt(combined[i]);
+    }
+
+    // 6. Split into 24 groups of 11 bits (MSB first)
+    const indices = [];
+    for (let i = 0; i < 24; i++) {
+        const shift = BigInt(253 - i * 11);
+        const idx = Number((bigInt >> shift) & 0x7FFn);
+        indices.push(idx);
+    }
+
+    // 7. Map to words
+    const words = indices.map(i => WORDLIST[i]);
+
+    return { words, indices, entropy };
+}
+
+// ==================== RENDER RESULT ====================
+async function renderResult() {
+    const result = await generateSeedPhrase();
+    if (!result) return;
+
+    const { words, indices } = result;
+
+    // Metadata
+    resultMeta.textContent = 'Generated from ' + rolls.length + ' dice rolls';
+
+    // Table
+    wordTableBody.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+        const tr = document.createElement('tr');
+        const bin = to11BitBinary(indices[i]);
+        tr.innerHTML =
+            '<td class="col-num">' + (i + 1) + '</td>' +
+            '<td class="col-idx">' + indices[i] + '</td>' +
+            '<td class="col-bin">' + bin + '</td>' +
+            '<td class="col-word">' + words[i] + '</td>';
+        wordTableBody.appendChild(tr);
+    }
+
+    resultSection.classList.add('visible');
+
+    // Scroll to result on mobile
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ==================== ROLL MANAGEMENT ====================
+function addRoll(value) {
+    rolls.push(value);
+    updateUI();
+
+    // Auto-update result if it's visible
+    if (resultSection.classList.contains('visible')) {
+        renderResult();
+    }
+}
+
+function undoLastRoll() {
+    if (rolls.length === 0) return;
+    rolls.pop();
+    updateUI();
+
+    // Auto-update result if it's visible
+    if (resultSection.classList.contains('visible')) {
+        if (rolls.length >= MIN_ROLLS) {
+            renderResult();
+        } else {
+            resultSection.classList.remove('visible');
+        }
+    }
+}
+
+function resetRolls() {
+    if (rolls.length === 0) return;
+    if (!confirm('Are you sure you want to start over? All ' + rolls.length + ' rolls will be cleared.')) return;
+    rolls = [];
+    resultSection.classList.remove('visible');
+    wordTableBody.innerHTML = '';
+    updateUI();
+}
+
+// ==================== EVENT HANDLERS ====================
+// Dice buttons
+document.querySelectorAll('.dice-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const value = parseInt(btn.dataset.value);
+        addRoll(value);
+    });
+
+    // Prevent focus retention after click (better mobile UX)
+    btn.addEventListener('mousedown', e => e.preventDefault());
+});
+
+// Keyboard support
+document.addEventListener('keydown', (e) => {
+    // Ignore if focus is on an input/textarea
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    // Ctrl+Z for undo
+    if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault();
+        undoLastRoll();
+        return;
+    }
+
+    // Number keys 1-6
+    const num = parseInt(e.key);
+    if (num >= 1 && num <= 6) {
+        e.preventDefault();
+        addRoll(num);
+    }
+});
+
+// Undo button
+$('btnUndo').addEventListener('click', undoLastRoll);
+
+// Reset button
+$('btnReset').addEventListener('click', resetRolls);
+
+// Generate button
+btnGenerate.addEventListener('click', () => {
+    if (rolls.length >= MIN_ROLLS) {
+        renderResult();
+    }
+});
+
+// ==================== INIT ====================
+updateUI();
+</script>
+</body>
+</html>
