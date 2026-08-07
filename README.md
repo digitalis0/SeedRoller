@@ -23,7 +23,7 @@ Hardware wallets and software wallets generate seed phrases using built-in RNGs 
 
 ### On a laptop (recommended)
 
-1. On an **online computer**, download `SeedRoller.en.html` from this repository
+1. On an **online computer**, download `SeedRoller.html` from this repository
 2. Copy the file onto a **USB stick**
 3. **Eject** the USB stick safely
 4. On a **separate laptop** that is already **disconnected from the internet** (Wi-Fi off, Ethernet unplugged, airplane mode):
@@ -35,9 +35,9 @@ Hardware wallets and software wallets generate seed phrases using built-in RNGs 
 
 ### On a smartphone
 
-1. **Download** `SeedRoller.en.html` to your phone (via cable, SD card, or download it first, then go offline)
+1. **Download** `SeedRoller.html` to your phone (via cable, SD card, or download it first, then go offline)
 2. **Enable airplane mode** ✈️ — turn off Wi-Fi, Bluetooth, and mobile data
-3. Open the file with your browser (e.g., `file:///.../SeedRoller.en.html`)
+3. Open the file with your browser (e.g., `file:///.../SeedRoller.html`)
 4. Roll, tap, generate
 5. **Write the 24 words on paper**
 6. Delete the file from your phone
